@@ -4,9 +4,9 @@ Extension pour le panel Calagopus. Elle permet à une plateforme de facturation 
 
 ClientXCMS appelle cette extension de serveur à serveur avec un secret partagé, reçoit un ticket de connexion à usage unique, et redirige le navigateur du client dessus.
 
-> **En cours de développement, mais le socle est vérifié.** L'extension compile, s'installe et se charge réellement sur un panel `1.1.4` (voir la trace de démarrage `clientxcms sso extension loaded`).
+> **Fonctionnelle, vérifiée de bout en bout sur un panel `1.1.4`.** Un ticket est émis, consommé une seule fois, ouvre une session valide, et un rejeu répond `401`. La rotation du secret a également été vérifiée en service.
 >
-> En revanche elle n'émet encore **aucun ticket** : la logique décrite ci-dessous n'est pas implémentée. L'installer aujourd'hui n'apporte donc rien, et vous ferait basculer sur l'image `heavy` sans contrepartie.
+> Les conditions de licence ne sont pas encore arrêtées : voir la section Licence avant tout usage commercial.
 
 ## Pourquoi une extension et pas OAuth2
 
@@ -18,6 +18,7 @@ Calagopus sait déjà consommer un fournisseur OAuth2 générique : la plateform
 |---|---|
 | Panel | `>=1.1.4` |
 | Image | Une image **`heavy` officielle** (`ghcr.io/calagopus/panel:<version>-heavy`) |
+| Outil local | `zip`, pour empaqueter les sources. Aucune chaîne de compilation Rust n'est requise chez vous |
 
 Les extensions sont des crates Rust compilés dans le binaire du panel, pas des greffons déposés dans un dossier. L'image standard ne contient aucune chaîne de compilation et refuse purement et simplement de gérer des extensions :
 
@@ -29,6 +30,8 @@ extension management is only available in the official heavy container
 
 Sans eux, elle ne démarre pas et boucle sur `/app/binaries is missing or is not a directory` :
 
+À ajouter au service du panel dans votre `docker-compose.yml`, puis recréer le conteneur :
+
 ```yaml
 volumes:
   - ./build/binaries:/app/binaries
@@ -39,16 +42,81 @@ volumes:
 
 Conservez la même valeur d'`APP_ENCRYPTION_KEY` qu'auparavant : elle chiffre les secrets déjà présents en base.
 
-### Installation
+### Construire l'archive
 
-Deux voies, mais elles ne sont pas équivalentes :
+Une extension s'installe sous forme d'archive `zip`. Vous n'avez **rien à compiler vous-même** : le panel compile les sources à l'installation, c'est tout l'objet de l'image `heavy`. Il suffit donc d'empaqueter les sources telles quelles.
 
-| Voie | Résultat |
-|---|---|
-| `PUT /api/admin/extensions/manage/add?accept_license=true`, archive en corps binaire brut, puis `POST /api/admin/extensions/manage/rebuild` | **Correct.** L'archive arrive dans `/app/extensions`, que le superviseur lit |
-| `panel-rs extensions add` en ligne de commande | **Insuffisant en mode heavy.** L'archive est écrite dans `/app/repo/backend-extensions`, que le superviseur ignore. La reconstruction répond alors `these inputs are already built, nothing to do` et le binaire produit ne contient pas l'extension |
+```sh
+git clone https://github.com/Cerbonix/calagopus-sso.git
+cd calagopus-sso
+zip -r ../net_cerbonix_ssotickets.c7s.zip Metadata.toml backend frontend \
+  -x '*/target/*' '*/node_modules/*'
+```
+
+L'archive doit contenir `Metadata.toml`, `backend/` et `frontend/` **à sa racine**, sans dossier intermédiaire. C'est la structure du modèle officiel livré avec le panel, `.extension-templates/com_calagopus_template1.c7s.zip`.
+
+Le nom du fichier est libre : le panel lit le `package_name` du `Metadata.toml` et ignore le nom de l'archive. La convention `<package_name, points remplacés par des tirets bas>.c7s.zip` reste la plus lisible.
+
+### Installer
+
+Par l'interface du panel, dans **Admin > Extensions** (`/admin/extensions`) : le bouton d'ajout accepte un fichier `.zip`, puis la reconstruction se lance et affiche son avancement. C'est la voie recommandée, et la seule qui ne demande aucun outillage.
+
+En ligne de commande, si vous automatisez :
+
+```sh
+curl -X PUT "https://panel.example.net/api/admin/extensions/manage/add?accept_license=true" \
+  -H "Authorization: Bearer <clé API admin>" \
+  --data-binary @net_cerbonix_ssotickets.c7s.zip
+
+curl -X POST "https://panel.example.net/api/admin/extensions/manage/rebuild" \
+  -H "Authorization: Bearer <clé API admin>"
+```
+
+**N'utilisez pas `panel-rs extensions add`.** En mode heavy, l'archive est écrite dans `/app/repo/backend-extensions`, que le superviseur ignore. La reconstruction répond alors `these inputs are already built, nothing to do` et le binaire produit ne contient pas l'extension.
 
 Comptez une dizaine de minutes pour la première compilation, quelques dizaines de secondes ensuite tant que le cache de compilation reste chaud. L'extension doit être reconstruite à chaque montée de version du panel, qui publie chaque semaine.
+
+### Configurer le secret partagé
+
+**Depuis ClientXCMS, en une commande, sans rien saisir ici :**
+
+```sh
+php artisan calagopus:sso
+```
+
+Elle tire un secret au hasard, le pose sur le panel par la route ci-dessous, puis le conserve chiffré de son côté. C'est la voie normale, et elle garantit que les deux moitiés correspondent.
+
+La clé API que ClientXCMS utilise doit porter la permission **`ssotickets.manage`**, que cette extension ajoute au panel une fois installée.
+
+Si vous pilotez le panel seul, la route existe :
+
+```sh
+curl -X PUT "https://panel.example.net/api/admin/ssotickets/secret" \
+  -H "Authorization: Bearer <clé portant ssotickets.manage>" \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"<au moins 32 caractères>"}'
+```
+
+Le secret est stocké chiffré dans les réglages de l'extension. La rotation consiste à rejouer `php artisan calagopus:sso` : aucune reconstruction, aucun redémarrage.
+
+### Vérifier que ça marche
+
+Dans ClientXCMS, ouvrez la fiche du serveur et lancez **Tester la connexion** : il annonce explicitement si l'authentification unique est configurée. Puis, depuis un compte client disposant d'un service actif, cliquez sur « Ouvrir le panel » : vous devez arriver connecté, sans page de connexion.
+
+Au démarrage du panel, la trace `clientxcms sso extension loaded` confirme que l'extension est bien dans le binaire en cours d'exécution.
+
+### Si ça ne marche pas
+
+| Symptôme | Cause probable |
+|---|---|
+| `extension management is only available in the official heavy container` | Panel en image standard, voir Prérequis |
+| Le panel boucle sur `/app/binaries is missing or is not a directory` | Les quatre volumes ne sont pas montés |
+| `these inputs are already built, nothing to do` et extension absente | Installée via `panel-rs extensions add`, voir ci-dessus |
+| La reconstruction échoue | Les journaux de compilation sont exposés par `GET /api/admin/extensions/manage/logs`, et affichés dans **Admin > Extensions** |
+| Le client atterrit sur la page de connexion du panel | Secret absent ou désaccordé : rejouez `php artisan calagopus:sso` |
+| ClientXCMS signale une permission manquante | La clé API n'a pas `ssotickets.manage` |
+
+Pour connaître votre version de panel : elle est affichée dans l'administration du panel, et lisible par `GET /api/admin/system/overview`.
 
 ## Exigences de sécurité
 
@@ -90,9 +158,9 @@ Calagopus panel extension. It lets a billing platform sign one of its customers 
 
 ClientXCMS calls this extension server to server with a shared secret, gets back a single-use login ticket, and redirects the customer's browser onto it.
 
-> **Work in progress, but the groundwork is proven.** The extension compiles, installs and actually loads on a `1.1.4` panel (see the `clientxcms sso extension loaded` startup line).
+> **Working, verified end to end against a `1.1.4` panel.** A ticket is issued, consumed exactly once, opens a valid session, and a replay answers `401`. Secret rotation was verified in service too.
 >
-> It does **not issue any ticket** yet: the logic described below is not implemented. Installing it today buys you nothing, and moves you onto the `heavy` image for no return.
+> Licensing terms are not settled yet: read the License section before any commercial use.
 
 ## Why an extension and not OAuth2
 
@@ -104,6 +172,7 @@ Calagopus can already consume a generic OAuth2 provider, so the billing platform
 |---|---|
 | Panel | `>=1.1.4` |
 | Image | An **official `heavy` image** (`ghcr.io/calagopus/panel:<version>-heavy`) |
+| Local tool | `zip`, to package the sources. No Rust toolchain is needed on your side |
 
 Extensions are Rust crates compiled into the panel binary, not plugins dropped into a folder. The standard image carries no toolchain and flatly refuses to manage extensions:
 
@@ -115,6 +184,8 @@ extension management is only available in the official heavy container
 
 Without them it will not boot, looping on `/app/binaries is missing or is not a directory`:
 
+Add them to the panel service in your `docker-compose.yml`, then recreate the container:
+
 ```yaml
 volumes:
   - ./build/binaries:/app/binaries
@@ -125,16 +196,81 @@ volumes:
 
 Keep the same `APP_ENCRYPTION_KEY` as before: it decrypts the secrets already stored in your database.
 
+### Building the archive
+
+An extension installs as a `zip` archive. You compile **nothing yourself**: the panel builds the sources on install, which is the whole point of the `heavy` image. So you only package the sources as they are.
+
+```sh
+git clone https://github.com/Cerbonix/calagopus-sso.git
+cd calagopus-sso
+zip -r ../net_cerbonix_ssotickets.c7s.zip Metadata.toml backend frontend \
+  -x '*/target/*' '*/node_modules/*'
+```
+
+The archive must carry `Metadata.toml`, `backend/` and `frontend/` **at its root**, with no intermediate folder. That is the layout of the official template shipped with the panel, `.extension-templates/com_calagopus_template1.c7s.zip`.
+
+The file name is free: the panel reads `package_name` from `Metadata.toml` and ignores the archive name. The `<package_name, dots replaced with underscores>.c7s.zip` convention just stays the most readable.
+
 ### Installing
 
-Two routes, and they are not equivalent:
+Through the panel interface, under **Admin > Extensions** (`/admin/extensions`): the add button takes a `.zip` file, then the rebuild starts and reports its progress. This is the recommended route, and the only one needing no tooling at all.
 
-| Route | Outcome |
-|---|---|
-| `PUT /api/admin/extensions/manage/add?accept_license=true` with the archive as the raw body, then `POST /api/admin/extensions/manage/rebuild` | **Correct.** The archive lands in `/app/extensions`, which the supervisor reads |
-| `panel-rs extensions add` on the command line | **Not enough on the heavy image.** The archive is written to `/app/repo/backend-extensions`, which the supervisor ignores. The rebuild then answers `these inputs are already built, nothing to do` and the resulting binary does not carry the extension |
+On the command line, if you automate:
+
+```sh
+curl -X PUT "https://panel.example.net/api/admin/extensions/manage/add?accept_license=true" \
+  -H "Authorization: Bearer <admin API key>" \
+  --data-binary @net_cerbonix_ssotickets.c7s.zip
+
+curl -X POST "https://panel.example.net/api/admin/extensions/manage/rebuild" \
+  -H "Authorization: Bearer <admin API key>"
+```
+
+**Do not use `panel-rs extensions add`.** On the heavy image the archive is written to `/app/repo/backend-extensions`, which the supervisor ignores. The rebuild then answers `these inputs are already built, nothing to do` and the resulting binary does not carry the extension.
 
 Expect around ten minutes for the first build, then a matter of seconds while the compilation cache stays warm. The extension must be rebuilt on every panel upgrade, and the panel ships weekly.
+
+### Setting the shared secret
+
+**From ClientXCMS, in one command, with nothing to type here:**
+
+```sh
+php artisan calagopus:sso
+```
+
+It draws a random secret, sets it on the panel through the route below, then keeps it encrypted on its side. This is the normal route, and it guarantees both halves match.
+
+The API key ClientXCMS uses must carry the **`ssotickets.manage`** permission, which this extension adds to the panel once installed.
+
+If you drive the panel on its own, the route exists:
+
+```sh
+curl -X PUT "https://panel.example.net/api/admin/ssotickets/secret" \
+  -H "Authorization: Bearer <key carrying ssotickets.manage>" \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"<at least 32 characters>"}'
+```
+
+The secret is stored encrypted in the extension settings. Rotating it means running `php artisan calagopus:sso` again: no rebuild, no restart.
+
+### Checking it works
+
+In ClientXCMS, open the server page and run **Test connection**: it states plainly whether single sign-on is configured. Then, from a customer account holding an active service, click "Open the panel": you should land signed in, with no login page.
+
+On panel startup, the `clientxcms sso extension loaded` line confirms the extension is in the running binary.
+
+### When it does not work
+
+| Symptom | Likely cause |
+|---|---|
+| `extension management is only available in the official heavy container` | Panel on the standard image, see Requirements |
+| The panel loops on `/app/binaries is missing or is not a directory` | The four volumes are not mounted |
+| `these inputs are already built, nothing to do` and no extension | Installed through `panel-rs extensions add`, see above |
+| The rebuild fails | Build logs are served by `GET /api/admin/extensions/manage/logs`, and displayed under **Admin > Extensions** |
+| The customer lands on the panel login page | Missing or mismatched secret: run `php artisan calagopus:sso` again |
+| ClientXCMS reports a missing permission | The API key lacks `ssotickets.manage` |
+
+To find your panel version: it is shown in the panel admin area, and readable through `GET /api/admin/system/overview`.
 
 ## Security requirements
 
