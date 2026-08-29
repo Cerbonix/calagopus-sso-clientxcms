@@ -47,7 +47,7 @@ Conservez la même valeur d'`APP_ENCRYPTION_KEY` qu'auparavant : elle chiffre le
 Une extension s'installe sous forme d'archive `zip`. Vous n'avez **rien à compiler vous-même** : le panel compile les sources à l'installation, c'est tout l'objet de l'image `heavy`. Il suffit donc d'empaqueter les sources telles quelles.
 
 ```sh
-git clone https://github.com/Cerbonix/calagopus-sso.git
+git clone https://github.com/Cerbonix/calagopus-sso-clientxcms.git
 cd calagopus-sso
 zip -r ../net_cerbonix_ssotickets.c7s.zip Metadata.toml backend frontend \
   -x '*/target/*' '*/node_modules/*'
@@ -201,7 +201,7 @@ Keep the same `APP_ENCRYPTION_KEY` as before: it decrypts the secrets already st
 An extension installs as a `zip` archive. You compile **nothing yourself**: the panel builds the sources on install, which is the whole point of the `heavy` image. So you only package the sources as they are.
 
 ```sh
-git clone https://github.com/Cerbonix/calagopus-sso.git
+git clone https://github.com/Cerbonix/calagopus-sso-clientxcms.git
 cd calagopus-sso
 zip -r ../net_cerbonix_ssotickets.c7s.zip Metadata.toml backend frontend \
   -x '*/target/*' '*/node_modules/*'
