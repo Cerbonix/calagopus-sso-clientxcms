@@ -1,0 +1,11 @@
+[package]
+name = "net_cerbonix_clientxcms_sso"
+description = "Issues single-use login tickets so ClientXCMS can sign a customer into the panel."
+authors = ["Cerbonix"]
+version = "0.1.0"
+edition = { workspace = true }
+
+[dependencies]
+shared = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }

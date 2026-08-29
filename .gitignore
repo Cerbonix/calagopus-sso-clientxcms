@@ -1,0 +1,8 @@
+/target/
+/node_modules/
+*.c7s.zip
+.env
+*.log
+.DS_Store
+.idea/
+.vscode/
