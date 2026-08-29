@@ -4,7 +4,9 @@ Extension pour le panel Calagopus. Elle permet à une plateforme de facturation 
 
 ClientXCMS appelle cette extension de serveur à serveur avec un secret partagé, reçoit un ticket de connexion à usage unique, et redirige le navigateur du client dessus.
 
-> **En cours de développement.** Ce dépôt ne contient à ce jour que le squelette de l'extension. Ne l'installez pas.
+> **En cours de développement, mais le socle est vérifié.** L'extension compile, s'installe et se charge réellement sur un panel `1.1.4` (voir la trace de démarrage `clientxcms sso extension loaded`).
+>
+> En revanche elle n'émet encore **aucun ticket** : la logique décrite ci-dessous n'est pas implémentée. L'installer aujourd'hui n'apporte donc rien, et vous ferait basculer sur l'image `heavy` sans contrepartie.
 
 ## Pourquoi une extension et pas OAuth2
 
@@ -88,7 +90,9 @@ Calagopus panel extension. It lets a billing platform sign one of its customers 
 
 ClientXCMS calls this extension server to server with a shared secret, gets back a single-use login ticket, and redirects the customer's browser onto it.
 
-> **Work in progress.** This repository currently holds the extension skeleton only. Do not install it.
+> **Work in progress, but the groundwork is proven.** The extension compiles, installs and actually loads on a `1.1.4` panel (see the `clientxcms sso extension loaded` startup line).
+>
+> It does **not issue any ticket** yet: the logic described below is not implemented. Installing it today buys you nothing, and moves you onto the `heavy` image for no return.
 
 ## Why an extension and not OAuth2
 
