@@ -9,3 +9,13 @@ edition = { workspace = true }
 shared = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
+anyhow = { workspace = true }
+axum = { workspace = true }
+compact_str = { workspace = true }
+indexmap = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+tower-cookies = { workspace = true }
+utoipa = { workspace = true }
+utoipa-axum = { workspace = true }
+uuid = { workspace = true }
