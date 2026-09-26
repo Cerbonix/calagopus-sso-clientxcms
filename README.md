@@ -4,7 +4,7 @@ Extension pour le panel Calagopus. Elle permet à une plateforme de facturation 
 
 ClientXCMS appelle cette extension de serveur à serveur avec un secret partagé, reçoit un ticket de connexion à usage unique, et redirige le navigateur du client dessus.
 
-> **Fonctionnelle, vérifiée de bout en bout sur un panel `1.1.4`.** Un ticket est émis, consommé une seule fois, ouvre une session valide, et un rejeu répond `401`. La rotation du secret a également été vérifiée en service.
+> **Fonctionnelle, vérifiée de bout en bout sur un panel ``.** Un ticket est émis, consommé une seule fois, ouvre une session valide, et un rejeu répond `401`. La rotation du secret a également été vérifiée en service.
 >
 > Les conditions de licence ne sont pas encore arrêtées : voir la section Licence avant tout usage commercial.
 
@@ -120,7 +120,7 @@ Pour connaître votre version de panel : elle est affichée dans l'administratio
 
 ## Exigences de sécurité
 
-Ce sont des exigences, pas des suggestions. Elles existent parce que l'intégration Pterodactyl équivalente se trompe sur plusieurs d'entre elles.
+Ce sont des exigences, pas des suggestions.
 
 | Règle | Pourquoi |
 |---|---|
